@@ -1,0 +1,21 @@
+name,age,salary,experience,department,performance_score
+John Doe,28,65000,3,Engineering,85
+Jane Smith,32,75000,5,Marketing,92
+Bob Johnson,45,95000,12,Sales,78
+Alice Brown,29,58000,2,HR,88
+Charlie Wilson,38,82000,8,Engineering,91
+Diana Davis,26,52000,1,Marketing,82
+Frank Miller,41,88000,10,Sales,87
+Grace Lee,33,72000,6,HR,89
+Henry Taylor,31,69000,4,Engineering,86
+Ivy Chen,27,55000,2,Marketing,84
+Jack White,44,92000,11,Sales,90
+Kate Green,30,64000,3,HR,85
+Leo Black,36,78000,7,Engineering,88
+Mia Blue,25,48000,1,Marketing,81
+Nathan Gray,39,85000,9,Sales,89
+Olivia Purple,34,71000,5,HR,87
+Paul Orange,42,89000,10,Engineering,92
+Quinn Pink,28,59000,3,Marketing,83
+Ryan Red,37,80000,8,Sales,88
+Sara Yellow,29,62000,4,HR,86

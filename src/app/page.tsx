@@ -2,19 +2,43 @@ import Image from "next/image";
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
+    'use client';
+
+import { useState } from 'react';
+import { DataUpload } from '@/components/DataUpload';
+import { Dashboard } from '@/components/Dashboard';
+import { Header } from '@/components/Header';
+
+export default function Home() {
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<'upload' | 'dashboard'>('upload');
+
+  const handleDataUploaded = (newSessionId: string) => {
+    setSessionId(newSessionId);
+    setCurrentStep('dashboard');
+  };
+
+  const handleReset = () => {
+    setSessionId(null);
+    setCurrentStep('upload');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <Header onReset={handleReset} />
+      
+      <main className="container mx-auto px-4 py-8">
+        {currentStep === 'upload' && (
+          <DataUpload onDataUploaded={handleDataUploaded} />
+        )}
+        
+        {currentStep === 'dashboard' && sessionId && (
+          <Dashboard sessionId={sessionId} onBack={handleReset} />
+        )}
+      </main>
+    </div>
+  );
+}" "}
             <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
               src/app/page.tsx
             </code>
