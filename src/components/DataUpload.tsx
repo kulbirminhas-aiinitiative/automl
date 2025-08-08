@@ -18,6 +18,7 @@ interface UploadResponse {
     };
   };
   message: string;
+  is_duplicate?: boolean;
 }
 
 export function DataUpload({ onDataUploaded }: DataUploadProps) {
@@ -31,7 +32,7 @@ export function DataUpload({ onDataUploaded }: DataUploadProps) {
     if (selectedFile) {
       setFile(selectedFile);
       setError(null);
-      setUploadResult(null);
+      setUploadResult(null); // Clear previous results when new file is selected
     }
   }, []);
 
@@ -43,6 +44,7 @@ export function DataUpload({ onDataUploaded }: DataUploadProps) {
 
     setLoading(true);
     setError(null);
+    setUploadResult(null); // Clear previous results
 
     try {
       const formData = new FormData();
@@ -62,9 +64,11 @@ export function DataUpload({ onDataUploaded }: DataUploadProps) {
       setUploadResult(result);
       
       // Call the callback to switch to dashboard
+      // For duplicate files, reduce the timeout since no processing was needed
+      const timeoutDuration = result.is_duplicate ? 1000 : 2000;
       setTimeout(() => {
         onDataUploaded(result.session_id);
-      }, 2000);
+      }, timeoutDuration);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during upload');
@@ -153,7 +157,14 @@ export function DataUpload({ onDataUploaded }: DataUploadProps) {
             {loading && (
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
             )}
-            <span>{loading ? 'Analyzing Dataset...' : 'Upload and Analyze'}</span>
+            <span>
+              {loading 
+                ? 'Analyzing Dataset...' 
+                : uploadResult 
+                  ? 'Upload New Dataset' 
+                  : 'Upload and Analyze'
+              }
+            </span>
           </button>
 
           {/* Error Message */}
@@ -169,14 +180,26 @@ export function DataUpload({ onDataUploaded }: DataUploadProps) {
 
           {/* Success Message */}
           {uploadResult && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className={`border rounded-lg p-4 ${uploadResult.is_duplicate ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
               <div className="flex items-start space-x-3">
-                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                {uploadResult.is_duplicate ? (
+                  <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5" />
+                ) : (
+                  <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                )}
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-green-800">Upload Successful!</p>
-                  <p className="text-sm text-green-600 mb-3">{uploadResult.message}</p>
+                  <p className={`text-sm font-medium ${uploadResult.is_duplicate ? 'text-yellow-800' : 'text-green-800'}`}>
+                    {uploadResult.is_duplicate ? 'File Already Processed!' : 'Analysis Complete!'}
+                  </p>
+                  <p className={`text-sm mb-3 ${uploadResult.is_duplicate ? 'text-yellow-600' : 'text-green-600'}`}>
+                    {uploadResult.is_duplicate 
+                      ? 'This file has been uploaded before. Reusing existing analysis to save time.'
+                      : 'Your dataset has been uploaded and analyzed successfully.'
+                    }
+                    {uploadResult.filename && ` File: ${uploadResult.filename}`}
+                  </p>
                   
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-2 gap-4 text-xs mb-3">
                     <div>
                       <span className="font-medium">Dataset Shape:</span> {uploadResult.shape[0]} rows × {uploadResult.shape[1]} columns
                     </div>
@@ -185,9 +208,19 @@ export function DataUpload({ onDataUploaded }: DataUploadProps) {
                     </div>
                   </div>
                   
-                  <p className="text-xs text-green-600 mt-2">
-                    Redirecting to dashboard...
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className={`text-xs ${uploadResult.is_duplicate ? 'text-yellow-600' : 'text-green-600'}`}>
+                      {uploadResult.is_duplicate ? 'Ready to continue with existing analysis' : 'Redirecting to dashboard in 2 seconds...'}
+                    </p>
+                    <button
+                      onClick={() => onDataUploaded(uploadResult.session_id)}
+                      className={`text-xs text-white px-3 py-1 rounded hover:opacity-90 transition-colors ${
+                        uploadResult.is_duplicate ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                    >
+                      Go to Dashboard Now
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

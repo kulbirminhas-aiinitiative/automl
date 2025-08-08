@@ -20,13 +20,13 @@ interface DashboardProps {
  */
 interface ModelSuggestion {
   /** Name of the suggested model */
-  model_name: string;
+  model_name?: string;
   /** Confidence score for the suggestion (0-1) */
-  confidence: number;
+  confidence?: number;
   /** AI reasoning for why this model was suggested */
-  reasoning: string;
+  reasoning?: string;
   /** Recommended hyperparameters for the model */
-  hyperparameters: Record<string, unknown>;
+  hyperparameters?: Record<string, unknown>;
 }
 
 /**
@@ -95,7 +95,7 @@ interface SessionData {
 export function Dashboard({ sessionId, onBack }: DashboardProps) {
   // State management for dashboard data
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
-  const [suggestions, setSuggestions] = useState<ModelSuggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<(ModelSuggestion | string)[]>([]);
   const [trainingResults, setTrainingResults] = useState<TrainingResult[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -117,7 +117,27 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
       if (!response.ok) throw new Error('Failed to fetch session data');
       
       const data = await response.json();
-      setSessionData(data);
+      
+      // Transform API response to match expected interface
+      const transformedData: SessionData = {
+        filename: data.filename,
+        shape: [data.analysis.shape.rows, data.analysis.shape.columns],
+        columns: data.analysis.columns.names,
+        analysis: {
+          data_quality: {
+            overall_score: data.analysis.data_quality?.overall_score,
+            missing_percentage: data.analysis.missing_values?.total || 0,
+            duplicate_rows: 0 // API doesn't provide this yet
+          },
+          column_types: {
+            numerical: data.analysis.data_types?.numeric || [],
+            categorical: data.analysis.data_types?.categorical || [],
+            datetime: data.analysis.data_types?.datetime || []
+          }
+        }
+      };
+      
+      setSessionData(transformedData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load session data');
     }
@@ -137,11 +157,10 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8080/api/get-model-suggestions', {
+      const response = await fetch(`http://localhost:8080/api/suggest-models/${sessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: sessionId,
           target_column: selectedTarget
         })
       });
@@ -152,7 +171,7 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
       }
 
       const result = await response.json();
-      setSuggestions(result.suggestions);
+      setSuggestions(result.suggestions?.recommended_models || result.suggestions || []);
       setActiveTab('models');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get model suggestions');
@@ -171,13 +190,12 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8080/api/train-model', {
+      const response = await fetch(`http://localhost:8080/api/train-model/${sessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: sessionId,
-          model_name: modelName,
-          target_column: selectedTarget
+          target_column: selectedTarget,
+          selected_models: [modelName]
         })
       });
 
@@ -187,7 +205,7 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
       }
 
       const result = await response.json();
-      setTrainingResults(prev => [...prev, result]);
+      setTrainingResults(prev => [...prev, result.results || result]);
       setActiveTab('results');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Training failed');
@@ -410,35 +428,45 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
             </div>
           ) : (
             <div className="grid gap-6">
-              {suggestions.map((suggestion, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{suggestion.model_name}</h3>
-                      <p className="text-sm text-blue-600">Confidence: {(suggestion.confidence * 100).toFixed(1)}%</p>
-                    </div>
-                    <button
-                      onClick={() => handleTrainModel(suggestion.model_name)}
-                      disabled={loading}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
-                    >
-                      {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
-                      <span>Train Model</span>
-                    </button>
-                  </div>
-                  <p className="text-gray-600 mb-4">{suggestion.reasoning}</p>
-                  {Object.keys(suggestion.hyperparameters).length > 0 && (
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-2">Recommended Hyperparameters:</h4>
-                      <div className="bg-gray-50 rounded p-3">
-                        <code className="text-sm">
-                          {JSON.stringify(suggestion.hyperparameters, null, 2)}
-                        </code>
+              {suggestions.map((suggestion, index) => {
+                // Handle both string and object suggestions
+                const modelName = typeof suggestion === 'string' ? suggestion : suggestion.model_name || 'Unknown Model';
+                const confidence = typeof suggestion === 'object' && suggestion.confidence ? suggestion.confidence : null;
+                const reasoning = typeof suggestion === 'object' && suggestion.reasoning ? suggestion.reasoning : 'AI-recommended model for your dataset';
+                const hyperparameters = typeof suggestion === 'object' && suggestion.hyperparameters ? suggestion.hyperparameters : {};
+                
+                return (
+                  <div key={index} className="border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">{modelName}</h3>
+                        {confidence && (
+                          <p className="text-sm text-blue-600">Confidence: {(confidence * 100).toFixed(1)}%</p>
+                        )}
                       </div>
+                      <button
+                        onClick={() => handleTrainModel(modelName)}
+                        disabled={loading}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                      >
+                        {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
+                        <span>Train Model</span>
+                      </button>
                     </div>
-                  )}
-                </div>
-              ))}
+                    <p className="text-gray-600 mb-4">{reasoning}</p>
+                    {Object.keys(hyperparameters).length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-2">Recommended Hyperparameters:</h4>
+                        <div className="bg-gray-50 rounded p-3">
+                          <code className="text-sm">
+                            {JSON.stringify(hyperparameters, null, 2)}
+                          </code>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

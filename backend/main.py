@@ -9,11 +9,23 @@ from typing import Dict, List, Any, Optional
 import uvicorn
 from datetime import datetime
 import os
+import hashlib
+from pydantic import BaseModel
 
 from models.automl_orchestrator import AutoMLOrchestrator
 from utils.data_processor import DataProcessor
 from utils.model_evaluator import ModelEvaluator
 from utils.chart_generator import ChartGenerator
+
+# Request models
+class ModelSuggestionRequest(BaseModel):
+    target_column: str
+    problem_type: Optional[str] = None
+
+class TrainModelRequest(BaseModel):
+    target_column: str
+    selected_models: List[str]
+    train_config: Optional[Dict[str, Any]] = None
 
 app = FastAPI(
     title="AutoML Orchestration API",
@@ -24,7 +36,12 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "http://localhost:3004", 
+        "http://127.0.0.1:3004"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,6 +55,12 @@ chart_generator = ChartGenerator()
 
 # Store for active sessions
 active_sessions: Dict[str, Dict[str, Any]] = {}
+# Store for file hashes to prevent duplicate uploads
+file_hash_to_session: Dict[str, str] = {}
+
+def calculate_file_hash(content: bytes) -> str:
+    """Calculate MD5 hash of file content"""
+    return hashlib.md5(content).hexdigest()
 
 @app.get("/")
 async def root():
@@ -54,6 +77,24 @@ async def upload_data(file: UploadFile = File(...)):
         
         # Read file content
         content = await file.read()
+        
+        # Calculate file hash to check for duplicates
+        file_hash = calculate_file_hash(content)
+        
+        # Check if this file was already uploaded
+        if file_hash in file_hash_to_session:
+            existing_session_id = file_hash_to_session[file_hash]
+            if existing_session_id in active_sessions:
+                session_data = active_sessions[existing_session_id]
+                return {
+                    "session_id": existing_session_id,
+                    "filename": session_data["filename"],
+                    "shape": [len(session_data["data"]), len(session_data["data"].keys())],
+                    "columns": [str(col) for col in session_data["data"].keys()],
+                    "analysis": session_data["analysis"],
+                    "message": f"File already uploaded. Using existing analysis from session {existing_session_id}.",
+                    "is_duplicate": True
+                }
         
         # Process based on file type
         if file.filename.endswith('.csv'):
@@ -74,8 +115,12 @@ async def upload_data(file: UploadFile = File(...)):
             "data": df.to_dict(),
             "analysis": processed_data,
             "uploaded_at": datetime.now().isoformat(),
-            "filename": file.filename
+            "filename": file.filename,
+            "file_hash": file_hash
         }
+        
+        # Store file hash mapping
+        file_hash_to_session[file_hash] = session_id
         
         return {
             "session_id": session_id,
@@ -83,14 +128,15 @@ async def upload_data(file: UploadFile = File(...)):
             "shape": [int(df.shape[0]), int(df.shape[1])],
             "columns": [str(col) for col in df.columns],
             "analysis": processed_data,
-            "message": "Data uploaded and analyzed successfully"
+            "message": "Data uploaded and analyzed successfully",
+            "is_duplicate": False
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 @app.post("/api/suggest-models/{session_id}")
-async def suggest_models(session_id: str, target_column: str, problem_type: Optional[str] = None):
+async def suggest_models(session_id: str, request: ModelSuggestionRequest):
     """Get AI-powered model recommendations"""
     try:
         if session_id not in active_sessions:
@@ -102,20 +148,50 @@ async def suggest_models(session_id: str, target_column: str, problem_type: Opti
         # Get model suggestions from orchestrator
         suggestions = await orchestrator.suggest_models(
             df=df,
-            target_column=target_column,
-            problem_type=problem_type,
+            target_column=request.target_column,
+            problem_type=request.problem_type,
             data_analysis=session_data["analysis"]
         )
         
         return {
             "session_id": session_id,
-            "target_column": target_column,
+            "target_column": request.target_column,
             "suggestions": suggestions,
             "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating suggestions: {str(e)}")
+
+@app.post("/api/train-model/{session_id}")
+async def train_model(session_id: str, request: TrainModelRequest):
+    """Train selected models"""
+    try:
+        if session_id not in active_sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session_data = active_sessions[session_id]
+        df = pd.DataFrame(session_data["data"])
+        
+        # Train models
+        training_results = await orchestrator.train_models(
+            df=df,
+            target_column=request.target_column,
+            selected_models=request.selected_models,
+            config=request.train_config or {}
+        )
+        
+        # Store results in session
+        session_data["training_results"] = training_results
+        
+        return {
+            "session_id": session_id,
+            "target_column": request.target_column,
+            "results": training_results,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
 
 @app.post("/api/train-model/{session_id}")
 async def train_model(

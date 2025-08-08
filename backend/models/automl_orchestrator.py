@@ -115,9 +115,14 @@ class AutoMLOrchestrator:
             for model_name in selected_models:
                 if model_name in model_dict:
                     try:
-                        # Initialize model
+                        # Initialize model with appropriate parameters
                         model_class = model_dict[model_name]
-                        model = model_class(random_state=random_state)
+                        
+                        # Some models don't accept random_state
+                        if model_name in ["linear_regression", "naive_bayes"]:
+                            model = model_class()
+                        else:
+                            model = model_class(random_state=random_state)
                         
                         # Train model
                         start_time = datetime.now()
