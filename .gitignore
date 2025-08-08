@@ -42,12 +42,74 @@ next-env.d.ts
 
 # Python virtual environment
 v_automl/
+venv/
+env/
 
 # Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs
+logs/
+*.log
+
+# IDE and editor files
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+*.corrupted
+*.new
+
+# Model files (large ML models)
+*.pkl
+*.joblib
+*.h5
+*.onnx
+
+# Data files (exclude large datasets from git)
+data/*.csv
+data/*.json
+data/*.xlsx
+data/*.zip
+!data/sample_data.csv
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Kaggle API credentials
+kaggle.json
+
+# Copilot logs
+.copilot-log-config.js
+
+# Test outputs
+test_results/
+test_data/
 .Python
 build/
 develop-eggs/

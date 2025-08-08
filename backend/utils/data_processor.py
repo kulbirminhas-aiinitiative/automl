@@ -17,22 +17,22 @@ class DataProcessor:
         try:
             analysis = {
                 "shape": {
-                    "rows": len(df),
-                    "columns": len(df.columns)
+                    "rows": int(len(df)),
+                    "columns": int(len(df.columns))
                 },
                 "columns": {
-                    "names": df.columns.tolist(),
-                    "types": df.dtypes.to_dict()
+                    "names": [str(col) for col in df.columns],
+                    "types": {str(k): str(v) for k, v in df.dtypes.to_dict().items()}
                 },
                 "missing_values": {
                     "total": int(df.isnull().sum().sum()),
-                    "by_column": df.isnull().sum().to_dict(),
-                    "percentage": ((df.isnull().sum() / len(df)) * 100).to_dict()
+                    "by_column": {str(k): int(v) for k, v in df.isnull().sum().to_dict().items()},
+                    "percentage": {str(k): float(v) for k, v in ((df.isnull().sum() / len(df)) * 100).to_dict().items()}
                 },
                 "data_types": {
-                    "numeric": df.select_dtypes(include=[np.number]).columns.tolist(),
-                    "categorical": df.select_dtypes(include=['object', 'category']).columns.tolist(),
-                    "datetime": df.select_dtypes(include=['datetime64']).columns.tolist()
+                    "numeric": [str(col) for col in df.select_dtypes(include=[np.number]).columns],
+                    "categorical": [str(col) for col in df.select_dtypes(include=['object', 'category']).columns],
+                    "datetime": [str(col) for col in df.select_dtypes(include=['datetime64']).columns]
                 },
                 "summary_statistics": {},
                 "categorical_analysis": {},
@@ -42,15 +42,22 @@ class DataProcessor:
             # Numeric columns analysis
             numeric_cols = df.select_dtypes(include=[np.number]).columns
             if len(numeric_cols) > 0:
-                analysis["summary_statistics"] = df[numeric_cols].describe().to_dict()
+                stats_dict = df[numeric_cols].describe().to_dict()
+                # Convert numpy types to Python types
+                analysis["summary_statistics"] = {
+                    str(col): {str(stat): float(val) if pd.notna(val) else None 
+                              for stat, val in col_stats.items()}
+                    for col, col_stats in stats_dict.items()
+                }
             
             # Categorical columns analysis
             categorical_cols = df.select_dtypes(include=['object', 'category']).columns
             for col in categorical_cols:
-                analysis["categorical_analysis"][col] = {
+                col_str = str(col)
+                analysis["categorical_analysis"][col_str] = {
                     "unique_values": int(df[col].nunique()),
-                    "most_frequent": df[col].mode().iloc[0] if not df[col].mode().empty else None,
-                    "value_counts": df[col].value_counts().head(10).to_dict()
+                    "most_frequent": str(df[col].mode().iloc[0]) if not df[col].mode().empty else None,
+                    "value_counts": {str(k): int(v) for k, v in df[col].value_counts().head(10).to_dict().items()}
                 }
             
             # Data quality assessment

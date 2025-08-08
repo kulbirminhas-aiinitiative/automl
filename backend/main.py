@@ -80,8 +80,8 @@ async def upload_data(file: UploadFile = File(...)):
         return {
             "session_id": session_id,
             "filename": file.filename,
-            "shape": df.shape,
-            "columns": df.columns.tolist(),
+            "shape": [int(df.shape[0]), int(df.shape[1])],
+            "columns": [str(col) for col in df.columns],
             "analysis": processed_data,
             "message": "Data uploaded and analyzed successfully"
         }

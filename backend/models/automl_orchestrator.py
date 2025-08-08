@@ -55,14 +55,14 @@ class AutoMLOrchestrator:
             
             # Prepare data summary for LLM
             data_summary = {
-                "shape": df.shape,
-                "target_column": target_column,
+                "shape": [int(df.shape[0]), int(df.shape[1])],
+                "target_column": str(target_column),
                 "target_type": str(df[target_column].dtype),
-                "target_unique_values": df[target_column].nunique(),
-                "missing_values": df.isnull().sum().sum(),
-                "numeric_columns": len(df.select_dtypes(include=[np.number]).columns),
-                "categorical_columns": len(df.select_dtypes(include=['object', 'category']).columns),
-                "problem_type": problem_type
+                "target_unique_values": int(df[target_column].nunique()),
+                "missing_values": int(df.isnull().sum().sum()),
+                "numeric_columns": int(len(df.select_dtypes(include=[np.number]).columns)),
+                "categorical_columns": int(len(df.select_dtypes(include=['object', 'category']).columns)),
+                "problem_type": str(problem_type)
             }
             
             # Get LLM recommendations if API key is available
@@ -132,8 +132,8 @@ class AutoMLOrchestrator:
                         metrics = self._calculate_metrics(y_train, train_pred, y_test, test_pred, problem_type)
                         
                         results[model_name] = {
-                            "model": model_name,
-                            "training_time": training_time,
+                            "model": str(model_name),
+                            "training_time": float(training_time),
                             "metrics": metrics,
                             "feature_importance": self._get_feature_importance(model, X_processed.columns),
                             "status": "success"
@@ -141,15 +141,18 @@ class AutoMLOrchestrator:
                         
                     except Exception as e:
                         results[model_name] = {
-                            "model": model_name,
+                            "model": str(model_name),
                             "status": "error",
                             "error": str(e)
                         }
             
             return {
                 "results": results,
-                "problem_type": problem_type,
-                "data_shape": {"train": X_train.shape, "test": X_test.shape},
+                "problem_type": str(problem_type),
+                "data_shape": {
+                    "train": [int(X_train.shape[0]), int(X_train.shape[1])], 
+                    "test": [int(X_test.shape[0]), int(X_test.shape[1])]
+                },
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -189,19 +192,19 @@ class AutoMLOrchestrator:
         
         if problem_type == "classification":
             metrics = {
-                "train_accuracy": accuracy_score(y_train, train_pred),
-                "test_accuracy": accuracy_score(y_test, test_pred),
-                "precision": precision_score(y_test, test_pred, average='weighted', zero_division=0),
-                "recall": recall_score(y_test, test_pred, average='weighted', zero_division=0),
-                "f1_score": f1_score(y_test, test_pred, average='weighted', zero_division=0)
+                "train_accuracy": float(accuracy_score(y_train, train_pred)),
+                "test_accuracy": float(accuracy_score(y_test, test_pred)),
+                "precision": float(precision_score(y_test, test_pred, average='weighted', zero_division=0)),
+                "recall": float(recall_score(y_test, test_pred, average='weighted', zero_division=0)),
+                "f1_score": float(f1_score(y_test, test_pred, average='weighted', zero_division=0))
             }
         else:  # regression
             metrics = {
-                "train_mse": mean_squared_error(y_train, train_pred),
-                "test_mse": mean_squared_error(y_test, test_pred),
-                "train_mae": mean_absolute_error(y_train, train_pred),
-                "test_mae": mean_absolute_error(y_test, test_pred),
-                "r2_score": r2_score(y_test, test_pred)
+                "train_mse": float(mean_squared_error(y_train, train_pred)),
+                "test_mse": float(mean_squared_error(y_test, test_pred)),
+                "train_mae": float(mean_absolute_error(y_train, train_pred)),
+                "test_mae": float(mean_absolute_error(y_test, test_pred)),
+                "r2_score": float(r2_score(y_test, test_pred))
             }
         
         return metrics
@@ -211,12 +214,12 @@ class AutoMLOrchestrator:
         try:
             if hasattr(model, 'feature_importances_'):
                 importance = model.feature_importances_
-                return dict(zip(feature_names, importance.tolist()))
+                return {str(name): float(imp) for name, imp in zip(feature_names, importance)}
             elif hasattr(model, 'coef_'):
                 coef = model.coef_
                 if len(coef.shape) > 1:
                     coef = np.abs(coef).mean(axis=0)
-                return dict(zip(feature_names, np.abs(coef).tolist()))
+                return {str(name): float(imp) for name, imp in zip(feature_names, np.abs(coef))}
         except:
             pass
         
