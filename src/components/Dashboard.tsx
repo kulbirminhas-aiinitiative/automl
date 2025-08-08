@@ -3,22 +3,44 @@
 import { useState, useEffect } from 'react';
 import { Brain, BarChart3, TrendingUp, Download, RefreshCw, AlertTriangle } from 'lucide-react';
 
+/**
+ * Props interface for the Dashboard component
+ * @interface DashboardProps
+ */
 interface DashboardProps {
+  /** Session ID for the current AutoML session */
   sessionId: string;
+  /** Callback function to return to the data upload screen */
   onBack: () => void;
 }
 
+/**
+ * Interface for AI-generated model suggestions
+ * @interface ModelSuggestion
+ */
 interface ModelSuggestion {
+  /** Name of the suggested model */
   model_name: string;
+  /** Confidence score for the suggestion (0-1) */
   confidence: number;
+  /** AI reasoning for why this model was suggested */
   reasoning: string;
-  hyperparameters: Record<string, any>;
+  /** Recommended hyperparameters for the model */
+  hyperparameters: Record<string, unknown>;
 }
 
+/**
+ * Interface for model training results
+ * @interface TrainingResult
+ */
 interface TrainingResult {
+  /** Name of the trained model */
   model_name: string;
+  /** Performance metrics for the trained model */
   performance: Record<string, number>;
+  /** Time taken to train the model (in seconds) */
   training_time: number;
+  /** Generated visualization charts */
   charts: {
     confusion_matrix?: string;
     feature_importance?: string;
@@ -27,16 +49,51 @@ interface TrainingResult {
   };
 }
 
+/**
+ * Interface for session data containing dataset information
+ * @interface SessionData
+ */
 interface SessionData {
+  /** Original filename of the uploaded dataset */
   filename: string;
+  /** Shape of the dataset as [rows, columns] */
   shape: [number, number];
+  /** List of column names in the dataset */
   columns: string[];
-  analysis: any;
+  /** Data analysis results from the backend */
+  analysis: {
+    data_quality?: {
+      overall_score?: number;
+      missing_percentage?: number;
+      duplicate_rows?: number;
+    };
+    column_types?: {
+      numerical?: string[];
+      categorical?: string[];
+      datetime?: string[];
+    };
+  };
+  /** Selected target column for prediction */
   target_column?: string;
+  /** Type of ML problem (classification/regression) */
   problem_type?: string;
 }
 
+/**
+ * Main Dashboard component for the AutoML application
+ * 
+ * Features:
+ * - Data overview and quality metrics
+ * - Target column selection
+ * - AI-powered model suggestions
+ * - Model training and results visualization
+ * - Interactive charts and performance metrics
+ * 
+ * @param props - Component props
+ * @returns JSX.Element
+ */
 export function Dashboard({ sessionId, onBack }: DashboardProps) {
+  // State management for dashboard data
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [suggestions, setSuggestions] = useState<ModelSuggestion[]>([]);
   const [trainingResults, setTrainingResults] = useState<TrainingResult[]>([]);
@@ -46,10 +103,15 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'models' | 'results'>('overview');
 
   useEffect(() => {
-    fetchSessionData();
+    void fetchSessionData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const fetchSessionData = async () => {
+  /**
+   * Fetches session data from the backend API
+   * @async
+   */
+  const fetchSessionData = async (): Promise<void> => {
     try {
       const response = await fetch(`http://localhost:8080/api/session/${sessionId}`);
       if (!response.ok) throw new Error('Failed to fetch session data');
@@ -61,7 +123,11 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
     }
   };
 
-  const handleGetSuggestions = async () => {
+  /**
+   * Handles getting AI-powered model suggestions
+   * @async
+   */
+  const handleGetSuggestions = async (): Promise<void> => {
     if (!selectedTarget) {
       setError('Please select a target column');
       return;
@@ -95,7 +161,12 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
     }
   };
 
-  const handleTrainModel = async (modelName: string) => {
+  /**
+   * Handles training a specific model
+   * @param modelName - Name of the model to train
+   * @async
+   */
+  const handleTrainModel = async (modelName: string): Promise<void> => {
     setLoading(true);
     setError(null);
 
@@ -125,7 +196,11 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
     }
   };
 
-  const generateCharts = async () => {
+  /**
+   * Generates visualization charts for the dataset
+   * @async
+   */
+  const generateCharts = async (): Promise<void> => {
     if (!selectedTarget) return;
 
     setLoading(true);
@@ -150,6 +225,7 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
     }
   };
 
+  // Loading state
   if (!sessionData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -185,7 +261,7 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
             {['overview', 'models', 'results'].map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab as any)}
+                onClick={() => setActiveTab(tab as 'overview' | 'models' | 'results')}
                 className={`py-4 px-2 border-b-2 font-medium text-sm capitalize transition-colors ${
                   activeTab === tab
                     ? 'border-blue-500 text-blue-600'
@@ -330,7 +406,7 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
           {suggestions.length === 0 ? (
             <div className="text-center py-8">
               <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No suggestions yet. Select a target column and click "Get AI Suggestions".</p>
+              <p className="text-gray-500">No suggestions yet. Select a target column and click &quot;Get AI Suggestions&quot;.</p>
             </div>
           ) : (
             <div className="grid gap-6">
@@ -400,7 +476,7 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Generated Charts:</h4>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(result.charts).map(([chartType, chartPath]) => (
+                        {Object.entries(result.charts).map(([chartType]) => (
                           <button
                             key={chartType}
                             className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200 transition-colors"

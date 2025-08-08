@@ -3,12 +3,32 @@
 import { Brain, Github, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
+/**
+ * Props interface for the Header component
+ * @interface HeaderProps
+ */
 interface HeaderProps {
+  /** Title text for the header */
   title?: string;
+  /** Subtitle text for the header */
   subtitle?: string;
+  /** Optional callback function to reset the application state */
+  onReset?: () => void;
 }
 
-export function Header({ title = "AutoML Solution", subtitle = "AI-Powered Machine Learning Platform" }: HeaderProps) {
+/**
+ * Header component for the AutoML application
+ * 
+ * Features:
+ * - Responsive navigation menu
+ * - Logo and branding
+ * - Mobile menu toggle
+ * - Optional reset functionality
+ * 
+ * @param props - Component props
+ * @returns JSX.Element
+ */
+export function Header({ title = "AutoML Solution", subtitle = "AI-Powered Machine Learning Platform", onReset }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -17,13 +37,19 @@ export function Header({ title = "AutoML Solution", subtitle = "AI-Powered Machi
         <div className="flex justify-between items-center h-16">
           {/* Logo and Title */}
           <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg">
-              <Brain className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">{title}</h1>
-              <p className="text-xs text-gray-600 hidden sm:block">{subtitle}</p>
-            </div>
+            <button 
+              onClick={onReset}
+              className="flex items-center space-x-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg p-1"
+              title={onReset ? "Return to Home" : undefined}
+            >
+              <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg">
+                <Brain className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+                <p className="text-xs text-gray-600 hidden sm:block">{subtitle}</p>
+              </div>
+            </button>
           </div>
 
           {/* Desktop Navigation */}

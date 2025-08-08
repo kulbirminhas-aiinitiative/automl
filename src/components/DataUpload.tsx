@@ -12,7 +12,11 @@ interface UploadResponse {
   filename: string;
   shape: [number, number];
   columns: string[];
-  analysis: any;
+  analysis: {
+    data_quality?: {
+      overall_score?: number;
+    };
+  };
   message: string;
 }
 

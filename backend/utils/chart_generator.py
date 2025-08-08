@@ -12,17 +12,66 @@ import json
 
 class ChartGenerator:
     """
-    Generate various charts and visualizations for data analysis and model results
+    ChartGenerator provides methods to create visualizations for data analysis and model results.
+    Supports matplotlib and plotly for chart generation, including:
+    - Data overview
+    - Correlation heatmap
+    - Distribution plots
+    - Missing values analysis
+    - Model performance comparison
+    - Feature importance charts
     """
     
-    def __init__(self):
-        # Set style for matplotlib
+    def __init__(self) -> None:
+        """
+        Initialize ChartGenerator with default matplotlib and seaborn styles.
+        """
         plt.style.use('default')
         sns.set_palette("husl")
     
+    def generate_chart(self, data: Dict[str, Any], chart_type: str = 'line') -> str:
+        """
+        Generates a chart from the given data and returns it as a base64 string.
+
+        Args:
+            data (Dict[str, Any]): Data for the chart. Should contain 'x' and 'y' keys.
+            chart_type (str): Type of chart ('line', 'bar', etc.).
+
+        Returns:
+            str: Base64-encoded image string.
+
+        Raises:
+            ValueError: If chart_type is unsupported or data is invalid.
+        """
+        plt.figure()
+        try:
+            if chart_type == 'line':
+                plt.plot(data['x'], data['y'])
+            elif chart_type == 'bar':
+                plt.bar(data['x'], data['y'])
+            else:
+                raise ValueError(f"Unsupported chart type: {chart_type}")
+            buf = BytesIO()
+            plt.savefig(buf, format='png')
+            plt.close()
+            buf.seek(0)
+            img_str = base64.b64encode(buf.read()).decode('utf-8')
+            return img_str
+        except Exception as e:
+            plt.close()
+            raise ValueError(f"Chart generation failed: {e}")
+    
     def generate_charts(self, df: pd.DataFrame, training_results: Optional[Dict] = None, chart_types: Optional[List[str]] = None) -> Dict[str, Any]:
         """
-        Generate comprehensive charts for the dataset and model results
+        Generate comprehensive charts for the dataset and model results.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            training_results (Optional[Dict]): Model training results.
+            chart_types (Optional[List[str]]): List of chart types to generate.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing generated charts and metadata.
         """
         charts = {}
         
@@ -67,7 +116,15 @@ class ChartGenerator:
             return {"error": f"Error generating charts: {str(e)}"}
     
     def _generate_data_overview(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Generate basic data overview charts"""
+        """
+        Generate basic data overview charts.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+
+        Returns:
+            Dict[str, Any]: Data types chart, basic statistics, shape, memory usage.
+        """
         try:
             # Data types distribution
             dtype_counts = df.dtypes.value_counts()
@@ -111,7 +168,15 @@ class ChartGenerator:
             return {"error": f"Error generating data overview: {str(e)}"}
     
     def _generate_correlation_heatmap(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Generate correlation heatmap for numeric columns"""
+        """
+        Generate correlation heatmap for numeric columns.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+
+        Returns:
+            Dict[str, Any]: Heatmap and high correlation pairs.
+        """
         try:
             numeric_df = df.select_dtypes(include=[np.number])
             
@@ -162,7 +227,15 @@ class ChartGenerator:
             return {"error": f"Error generating correlation heatmap: {str(e)}"}
     
     def _generate_distribution_plots(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Generate distribution plots for numeric columns"""
+        """
+        Generate distribution plots for numeric columns.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+
+        Returns:
+            Dict[str, Any]: Distribution plots and analyzed columns.
+        """
         try:
             numeric_cols = df.select_dtypes(include=[np.number]).columns[:6]  # Limit to 6 columns
             
@@ -211,7 +284,15 @@ class ChartGenerator:
             return {"error": f"Error generating distribution plots: {str(e)}"}
     
     def _generate_missing_values_chart(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Generate missing values visualization"""
+        """
+        Generate missing values visualization.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+
+        Returns:
+            Dict[str, Any]: Missing values chart and summary.
+        """
         try:
             missing_data = df.isnull().sum()
             missing_percentage = (missing_data / len(df)) * 100
@@ -266,7 +347,15 @@ class ChartGenerator:
             return {"error": f"Error generating missing values chart: {str(e)}"}
     
     def _generate_model_performance_chart(self, training_results: Dict) -> Dict[str, Any]:
-        """Generate model performance comparison charts"""
+        """
+        Generate model performance comparison charts.
+
+        Args:
+            training_results (Dict): Model training results.
+
+        Returns:
+            Dict[str, Any]: Performance and training time charts, best model.
+        """
         try:
             results = training_results.get("results", {})
             problem_type = training_results.get("problem_type", "classification")
@@ -346,7 +435,15 @@ class ChartGenerator:
             return {"error": f"Error generating model performance chart: {str(e)}"}
     
     def _generate_feature_importance_chart(self, training_results: Dict) -> Dict[str, Any]:
-        """Generate feature importance charts for models that support it"""
+        """
+        Generate feature importance charts for models that support it.
+
+        Args:
+            training_results (Dict): Model training results.
+
+        Returns:
+            Dict[str, Any]: Feature importance charts and models with importance.
+        """
         try:
             results = training_results.get("results", {})
             
