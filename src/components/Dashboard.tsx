@@ -30,18 +30,49 @@ interface ModelSuggestion {
 }
 
 /**
+ * Interface for enhanced suggestions with performance comparison
+ * @interface EnhancedSuggestions
+ */
+interface EnhancedSuggestions {
+  /** Problem type (classification/regression) */
+  problem_type?: string;
+  /** Model comparison results */
+  model_comparison?: Record<string, {
+    model_name: string;
+    training_time: number;
+    primary_score: number;
+    primary_metric: string;
+    status: string;
+  }>;
+  /** Performance ranking of models */
+  performance_ranking?: string[];
+  /** Recommended models (top performers) */
+  recommended_models?: string[];
+  /** Rule-based suggestions with reasoning */
+  rule_based_suggestions?: {
+    recommended_models: string[];
+    reasoning: string[];
+    method?: string;
+  };
+}
+
+/**
  * Interface for model training results
  * @interface TrainingResult
  */
 interface TrainingResult {
   /** Name of the trained model */
-  model_name: string;
+  model_name?: string;
+  /** Alternative field name for model */
+  model?: string;
   /** Performance metrics for the trained model */
-  performance: Record<string, number>;
+  performance?: Record<string, number>;
+  /** Alternative field name for metrics */
+  metrics?: Record<string, number>;
   /** Time taken to train the model (in seconds) */
-  training_time: number;
+  training_time?: number;
   /** Generated visualization charts */
-  charts: {
+  charts?: {
     confusion_matrix?: string;
     feature_importance?: string;
     learning_curve?: string;
@@ -95,7 +126,7 @@ interface SessionData {
 export function Dashboard({ sessionId, onBack }: DashboardProps) {
   // State management for dashboard data
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
-  const [suggestions, setSuggestions] = useState<(ModelSuggestion | string)[]>([]);
+  const [suggestions, setSuggestions] = useState<EnhancedSuggestions | null>(null);
   const [trainingResults, setTrainingResults] = useState<TrainingResult[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -112,11 +143,15 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
    * @async
    */
   const fetchSessionData = async (): Promise<void> => {
+    console.log('🔄 Dashboard: Fetching session data for session:', sessionId);
     try {
-      const response = await fetch(`http://localhost:8080/api/session/${sessionId}`);
+      const response = await fetch(`http://localhost:8000/api/session/${sessionId}`);
+      console.log('📡 Dashboard: Session API response status:', response.status);
+      
       if (!response.ok) throw new Error('Failed to fetch session data');
       
       const data = await response.json();
+      console.log('📊 Dashboard: Session data received:', data);
       
       // Transform API response to match expected interface
       const transformedData: SessionData = {
@@ -138,7 +173,9 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
       };
       
       setSessionData(transformedData);
+      console.log('✅ Dashboard: Session data loaded successfully');
     } catch (err) {
+      console.error('❌ Dashboard: Error fetching session data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load session data');
     }
   };
@@ -153,11 +190,12 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
       return;
     }
 
+    console.log('🤖 Dashboard: Getting suggestions for target:', selectedTarget);
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:8080/api/suggest-models/${sessionId}`, {
+      const response = await fetch(`http://localhost:8000/api/suggest-models/${sessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,15 +203,30 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
         })
       });
 
+      console.log('📡 Dashboard: Suggestions API response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to get suggestions');
       }
 
       const result = await response.json();
-      setSuggestions(result.suggestions?.recommended_models || result.suggestions || []);
+      console.log('🎯 Dashboard: Suggestions received:', result);
+      
+      // Handle the enhanced suggestions structure
+      const enhancedSuggestions: EnhancedSuggestions = {
+        problem_type: result.suggestions?.problem_type,
+        model_comparison: result.suggestions?.model_comparison,
+        performance_ranking: result.suggestions?.performance_ranking,
+        recommended_models: result.suggestions?.recommended_models,
+        rule_based_suggestions: result.suggestions?.rule_based_suggestions
+      };
+      
+      setSuggestions(enhancedSuggestions);
       setActiveTab('models');
+      console.log('✅ Dashboard: Suggestions loaded successfully');
     } catch (err) {
+      console.error('❌ Dashboard: Error getting suggestions:', err);
       setError(err instanceof Error ? err.message : 'Failed to get model suggestions');
     } finally {
       setLoading(false);
@@ -190,7 +243,7 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:8080/api/train-model/${sessionId}`, {
+      const response = await fetch(`http://localhost:8000/api/train-model/${sessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -205,7 +258,47 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
       }
 
       const result = await response.json();
-      setTrainingResults(prev => [...prev, result.results || result]);
+      console.log('🎯 Dashboard: Training result received:', result);
+      
+      // Transform the API response to match our interface
+      let trainingResult: TrainingResult;
+      
+      if (result.results && result.results.results && result.results.results[modelName]) {
+        // Handle the nested results.results.modelName structure
+        const modelData = result.results.results[modelName];
+        trainingResult = {
+          model_name: modelData.model || modelName,
+          model: modelData.model || modelName,
+          training_time: modelData.training_time,
+          metrics: modelData.metrics,
+          performance: modelData.metrics, // Use metrics as performance
+          charts: modelData.charts || {}
+        };
+      } else if (result.results && result.results[modelName]) {
+        // Handle results.modelName structure
+        const modelData = result.results[modelName];
+        trainingResult = {
+          model_name: modelData.model || modelName,
+          model: modelData.model || modelName,
+          training_time: modelData.training_time,
+          metrics: modelData.metrics,
+          performance: modelData.metrics,
+          charts: modelData.charts || {}
+        };
+      } else {
+        // Handle direct result structure
+        trainingResult = {
+          model_name: result.model || modelName,
+          model: result.model || modelName,
+          training_time: result.training_time,
+          metrics: result.metrics,
+          performance: result.metrics,
+          charts: result.charts || {}
+        };
+      }
+      
+      console.log('✅ Dashboard: Transformed training result:', trainingResult);
+      setTrainingResults(prev => [...prev, trainingResult]);
       setActiveTab('results');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Training failed');
@@ -222,8 +315,9 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
     if (!selectedTarget) return;
 
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch('http://localhost:8080/api/generate-charts', {
+      const response = await fetch('http://localhost:8000/api/generate-charts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -232,10 +326,31 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to generate charts');
-      
-      // Charts are generated and can be accessed via the API
-      console.log('Charts generated successfully');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to generate charts');
+      }
+
+      const result = await response.json();
+      // Defensive: check for charts structure
+      if (!result.charts || !result.charts.charts) {
+        setError('No chart data returned from backend');
+        return;
+      }
+
+      // Store chart data in trainingResults for display in results tab
+      setTrainingResults(prev => [
+        ...prev,
+        {
+          model_name: 'Data Charts',
+          charts: result.charts.charts,
+          training_time: 0,
+          metrics: {},
+          performance: {}
+        }
+      ]);
+      setActiveTab('results');
+      console.log('✅ Charts loaded:', result.charts.charts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate charts');
     } finally {
@@ -420,53 +535,136 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
 
       {activeTab === 'models' && (
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">AI Model Suggestions</h2>
-          {suggestions.length === 0 ? (
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">AI Model Suggestions & Performance Comparison</h2>
+          {!suggestions || !suggestions.recommended_models ? (
             <div className="text-center py-8">
               <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No suggestions yet. Select a target column and click &quot;Get AI Suggestions&quot;.</p>
             </div>
           ) : (
-            <div className="grid gap-6">
-              {suggestions.map((suggestion, index) => {
-                // Handle both string and object suggestions
-                const modelName = typeof suggestion === 'string' ? suggestion : suggestion.model_name || 'Unknown Model';
-                const confidence = typeof suggestion === 'object' && suggestion.confidence ? suggestion.confidence : null;
-                const reasoning = typeof suggestion === 'object' && suggestion.reasoning ? suggestion.reasoning : 'AI-recommended model for your dataset';
-                const hyperparameters = typeof suggestion === 'object' && suggestion.hyperparameters ? suggestion.hyperparameters : {};
+            <div className="space-y-6">
+              {/* Performance Comparison Table */}
+              {suggestions.model_comparison && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">🏆 Model Performance Comparison</h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border border-gray-200 rounded-lg">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Rank</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Model</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Performance</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Training Time</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {suggestions.performance_ranking?.slice(0, 7).map((modelName, index) => {
+                          const comparison = suggestions.model_comparison?.[modelName];
+                          if (!comparison) return null;
+                          
+                          const isRecommended = suggestions.recommended_models?.includes(modelName);
+                          const rankColors = ['text-yellow-600', 'text-gray-600', 'text-orange-600'];
+                          const rankColor = rankColors[index] || 'text-gray-500';
+                          
+                          return (
+                            <tr key={modelName} className={isRecommended ? 'bg-blue-50' : ''}>
+                              <td className={`px-4 py-3 text-sm font-bold ${rankColor}`}>
+                                #{index + 1}
+                                {index === 0 && ' 🥇'}
+                                {index === 1 && ' 🥈'}
+                                {index === 2 && ' 🥉'}
+                              </td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                {modelName}
+                                {isRecommended && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Recommended</span>}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                {comparison.primary_metric}: {comparison.primary_score.toFixed(3)}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                {comparison.training_time.toFixed(3)}s
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className={`px-2 py-1 rounded-full text-xs ${
+                                  comparison.status === 'success' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {comparison.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <button
+                                  onClick={() => handleTrainModel(modelName)}
+                                  disabled={loading || comparison.status !== 'success'}
+                                  className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                >
+                                  Train Full Model
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Recommendations */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">🤖 AI Recommendations</h3>
+                {suggestions.rule_based_suggestions?.reasoning && (
+                  <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Analysis Summary:</h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      {suggestions.rule_based_suggestions.reasoning.map((reason, index) => (
+                        <li key={index}>• {reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 
-                return (
-                  <div key={index} className="border border-gray-200 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{modelName}</h3>
-                        {confidence && (
-                          <p className="text-sm text-blue-600">Confidence: {(confidence * 100).toFixed(1)}%</p>
+                <div className="grid gap-4">
+                  {suggestions.recommended_models?.slice(0, 3).map((modelName, index) => {
+                    const comparison = suggestions.model_comparison?.[modelName];
+                    
+                    return (
+                      <div key={modelName} className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <h4 className="text-lg font-semibold text-gray-900">
+                              {index === 0 && '🥇 '}{index === 1 && '🥈 '}{index === 2 && '🥉 '}
+                              {modelName}
+                            </h4>
+                            {comparison && (
+                              <p className="text-sm text-blue-600">
+                                {comparison.primary_metric}: {comparison.primary_score.toFixed(3)} 
+                                | Training time: {comparison.training_time.toFixed(3)}s
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleTrainModel(modelName)}
+                            disabled={loading}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                          >
+                            {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
+                            <span>Train Full Model</span>
+                          </button>
+                        </div>
+                        {index === 0 && (
+                          <p className="text-sm text-gray-600">
+                            🏆 Best performing model based on actual testing with your data
+                          </p>
                         )}
                       </div>
-                      <button
-                        onClick={() => handleTrainModel(modelName)}
-                        disabled={loading}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
-                      >
-                        {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
-                        <span>Train Model</span>
-                      </button>
-                    </div>
-                    <p className="text-gray-600 mb-4">{reasoning}</p>
-                    {Object.keys(hyperparameters).length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Recommended Hyperparameters:</h4>
-                        <div className="bg-gray-50 rounded p-3">
-                          <code className="text-sm">
-                            {JSON.stringify(hyperparameters, null, 2)}
-                          </code>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -485,13 +683,13 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
               {trainingResults.map((result, index) => (
                 <div key={index} className="border border-gray-200 rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{result.model_name}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{result.model_name || result.model || 'Unknown Model'}</h3>
                     <span className="text-sm text-gray-500">
-                      Training time: {result.training_time.toFixed(2)}s
+                      Training time: {result.training_time ? result.training_time.toFixed(2) : 'N/A'}s
                     </span>
                   </div>
                   <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    {Object.entries(result.performance).map(([metric, value]) => (
+                    {Object.entries(result.performance || result.metrics || {}).map(([metric, value]) => (
                       <div key={metric} className="bg-gray-50 rounded p-3">
                         <p className="text-sm text-gray-600 capitalize">{metric.replace('_', ' ')}</p>
                         <p className="text-lg font-semibold text-gray-900">
@@ -500,11 +698,11 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
                       </div>
                     ))}
                   </div>
-                  {Object.keys(result.charts).length > 0 && (
+                  {result.charts && Object.keys(result.charts).length > 0 && (
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Generated Charts:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(result.charts).map(([chartType]) => (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {Object.entries(result.charts).map(([chartType, chartData]) => (
                           <button
                             key={chartType}
                             className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200 transition-colors"
@@ -512,6 +710,18 @@ export function Dashboard({ sessionId, onBack }: DashboardProps) {
                             {chartType.replace('_', ' ')}
                           </button>
                         ))}
+                      </div>
+                      {/* Chart error display and JSON preview */}
+                      {Object.entries(result.charts).map(([chartType, chartData]) => (
+                        chartData && typeof chartData === 'object' && 'error' in chartData ? (
+                          <div key={chartType} className="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
+                            <strong className="text-red-700">{chartType.replace('_', ' ')} Error:</strong>
+                            <span className="text-red-600 ml-2">{chartData.error}</span>
+                          </div>
+                        ) : null
+                      ))}
+                      <div className="bg-gray-50 rounded p-3 text-xs overflow-auto max-h-64">
+                        <pre>{JSON.stringify(result.charts, null, 2)}</pre>
                       </div>
                     </div>
                   )}

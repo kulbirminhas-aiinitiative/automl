@@ -1,0 +1,11 @@
+name,age,salary,experience,department,performance_score,years_in_company
+Alice Johnson,28,65000,3,Engineering,85,2
+Bob Smith,32,75000,5,Marketing,92,4
+Carol Brown,45,95000,12,Sales,78,8
+David Wilson,29,58000,2,HR,88,1
+Eve Davis,38,82000,8,Engineering,91,6
+Frank Miller,26,52000,1,Marketing,82,1
+Grace Taylor,41,88000,10,Sales,87,7
+Henry Lee,33,72000,6,HR,89,4
+Iris Chen,31,69000,4,Engineering,86,3
+Jack White,27,62000,2,Marketing,84,2

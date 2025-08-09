@@ -106,6 +106,18 @@ class ChartGenerator:
             if "feature_importance" in chart_types and training_results:
                 charts["feature_importance"] = self._generate_feature_importance_chart(training_results)
             
+            # Fallback: If no charts generated, add categorical value count chart
+            if not charts:
+                cat_cols = df.select_dtypes(include=["object", "category"]).columns
+                if len(cat_cols) > 0:
+                    col = cat_cols[0]
+                    value_counts = df[col].value_counts()
+                    fig = go.Figure(data=[
+                        go.Bar(x=value_counts.index.astype(str), y=value_counts.values, marker_color='lightblue')
+                    ])
+                    fig.update_layout(title=f"Value Counts for {col}", xaxis_title=col, yaxis_title="Count", template="plotly_white")
+                    charts["categorical_value_counts"] = {"chart": json.loads(fig.to_json()), "column": col}
+            
             return {
                 "charts": charts,
                 "chart_count": len(charts),
@@ -125,47 +137,38 @@ class ChartGenerator:
         Returns:
             Dict[str, Any]: Data types chart, basic statistics, shape, memory usage.
         """
-        try:
-            # Data types distribution
-            dtype_counts = df.dtypes.value_counts()
-            
-            fig = go.Figure(data=[
-                go.Bar(
-                    x=dtype_counts.index.astype(str),
-                    y=dtype_counts.values,
-                    marker_color='skyblue'
-                )
-            ])
-            
-            fig.update_layout(
-                title="Data Types Distribution",
-                xaxis_title="Data Type",
-                yaxis_title="Count",
-                template="plotly_white"
+        # Data types distribution
+        dtype_counts = df.dtypes.value_counts()
+        fig = go.Figure(data=[
+            go.Bar(
+                x=dtype_counts.index.astype(str),
+                y=dtype_counts.values,
+                marker_color='skyblue'
             )
-            
-            # Basic statistics
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            stats_data = []
-            
-            for col in numeric_cols[:5]:  # Limit to first 5 numeric columns
-                stats_data.append({
-                    'column': col,
-                    'mean': df[col].mean(),
-                    'std': df[col].std(),
-                    'min': df[col].min(),
-                    'max': df[col].max()
-                })
-            
-            return {
-                "data_types_chart": json.loads(fig.to_json()),
-                "basic_statistics": stats_data,
-                "shape": df.shape,
-                "memory_usage": df.memory_usage(deep=True).sum()
-            }
-            
-        except Exception as e:
-            return {"error": f"Error generating data overview: {str(e)}"}
+        ])
+        fig.update_layout(
+            title="Data Types Distribution",
+            xaxis_title="Data Type",
+            yaxis_title="Count",
+            template="plotly_white"
+        )
+        # Basic statistics
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        stats_data = []
+        for col in numeric_cols[:5]:  # Limit to first 5 numeric columns
+            stats_data.append({
+                'column': col,
+                'mean': df[col].mean(),
+                'std': df[col].std(),
+                'min': df[col].min(),
+                'max': df[col].max()
+            })
+        return {
+            "data_types_chart": json.loads(fig.to_json()),
+            "basic_statistics": stats_data,
+            "shape": df.shape,
+            "memory_usage": df.memory_usage(deep=True).sum()
+        }
     
     def _generate_correlation_heatmap(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
@@ -177,54 +180,41 @@ class ChartGenerator:
         Returns:
             Dict[str, Any]: Heatmap and high correlation pairs.
         """
-        try:
-            numeric_df = df.select_dtypes(include=[np.number])
-            
-            if numeric_df.empty:
-                return {"message": "No numeric columns found for correlation analysis"}
-            
-            # Calculate correlation matrix
-            corr_matrix = numeric_df.corr()
-            
-            # Create heatmap using plotly
-            fig = go.Figure(data=go.Heatmap(
-                z=corr_matrix.values,
-                x=corr_matrix.columns,
-                y=corr_matrix.columns,
-                colorscale='RdBu',
-                zmid=0,
-                text=corr_matrix.round(2).values,
-                texttemplate="%{text}",
-                textfont={"size": 10},
-                hoverongaps=False
-            ))
-            
-            fig.update_layout(
-                title="Feature Correlation Heatmap",
-                template="plotly_white",
-                width=600,
-                height=600
-            )
-            
-            # Find highly correlated pairs
-            corr_pairs = []
-            for i in range(len(corr_matrix.columns)):
-                for j in range(i+1, len(corr_matrix.columns)):
-                    corr_val = corr_matrix.iloc[i, j]
-                    if abs(corr_val) > 0.7:
-                        corr_pairs.append({
-                            'feature1': corr_matrix.columns[i],
-                            'feature2': corr_matrix.columns[j],
-                            'correlation': corr_val
-                        })
-            
-            return {
-                "heatmap": json.loads(fig.to_json()),
-                "high_correlations": corr_pairs
-            }
-            
-        except Exception as e:
-            return {"error": f"Error generating correlation heatmap: {str(e)}"}
+        numeric_df = df.select_dtypes(include=[np.number])
+        # Calculate correlation matrix
+        corr_matrix = numeric_df.corr()
+        fig = go.Figure(data=go.Heatmap(
+            z=corr_matrix.values,
+            x=corr_matrix.columns,
+            y=corr_matrix.columns,
+            colorscale='RdBu',
+            zmid=0,
+            text=corr_matrix.round(2).values,
+            texttemplate="%{text}",
+            textfont={"size": 10},
+            hoverongaps=False
+        ))
+        fig.update_layout(
+            title="Feature Correlation Heatmap",
+            template="plotly_white",
+            width=600,
+            height=600
+        )
+        # Find highly correlated pairs
+        corr_pairs = []
+        for i in range(len(corr_matrix.columns)):
+            for j in range(i+1, len(corr_matrix.columns)):
+                corr_val = corr_matrix.iloc[i, j]
+                if abs(corr_val) > 0.7:
+                    corr_pairs.append({
+                        'feature1': corr_matrix.columns[i],
+                        'feature2': corr_matrix.columns[j],
+                        'correlation': corr_val
+                    })
+        return {
+            "heatmap": json.loads(fig.to_json()),
+            "high_correlations": corr_pairs
+        }
     
     def _generate_distribution_plots(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
@@ -236,52 +226,39 @@ class ChartGenerator:
         Returns:
             Dict[str, Any]: Distribution plots and analyzed columns.
         """
-        try:
-            numeric_cols = df.select_dtypes(include=[np.number]).columns[:6]  # Limit to 6 columns
-            
-            if len(numeric_cols) == 0:
-                return {"message": "No numeric columns found for distribution analysis"}
-            
-            # Create subplots
-            n_cols = min(3, len(numeric_cols))
-            n_rows = (len(numeric_cols) + n_cols - 1) // n_cols
-            
-            fig = make_subplots(
-                rows=n_rows,
-                cols=n_cols,
-                subplot_titles=list(numeric_cols),
-                vertical_spacing=0.08
+        numeric_cols = df.select_dtypes(include=[np.number]).columns[:6]  # Limit to 6 columns
+        # Create subplots
+        n_cols = min(3, len(numeric_cols))
+        n_rows = (len(numeric_cols) + n_cols - 1) // n_cols
+        fig = make_subplots(
+            rows=n_rows,
+            cols=n_cols,
+            subplot_titles=list(numeric_cols),
+            vertical_spacing=0.08
+        )
+        for idx, col in enumerate(numeric_cols):
+            row = idx // n_cols + 1
+            col_pos = idx % n_cols + 1
+            # Create histogram
+            fig.add_trace(
+                go.Histogram(
+                    x=df[col].dropna(),
+                    name=col,
+                    showlegend=False,
+                    marker_color='lightblue'
+                ),
+                row=row,
+                col=col_pos
             )
-            
-            for idx, col in enumerate(numeric_cols):
-                row = idx // n_cols + 1
-                col_pos = idx % n_cols + 1
-                
-                # Create histogram
-                fig.add_trace(
-                    go.Histogram(
-                        x=df[col].dropna(),
-                        name=col,
-                        showlegend=False,
-                        marker_color='lightblue'
-                    ),
-                    row=row,
-                    col=col_pos
-                )
-            
-            fig.update_layout(
-                title="Distribution of Numeric Features",
-                template="plotly_white",
-                height=300 * n_rows
-            )
-            
-            return {
-                "distribution_plots": json.loads(fig.to_json()),
-                "analyzed_columns": list(numeric_cols)
-            }
-            
-        except Exception as e:
-            return {"error": f"Error generating distribution plots: {str(e)}"}
+        fig.update_layout(
+            title="Distribution of Numeric Features",
+            template="plotly_white",
+            height=300 * n_rows
+        )
+        return {
+            "distribution_plots": json.loads(fig.to_json()),
+            "analyzed_columns": list(numeric_cols)
+        }
     
     def _generate_missing_values_chart(self, df: pd.DataFrame) -> Dict[str, Any]:
         """

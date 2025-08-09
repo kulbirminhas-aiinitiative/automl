@@ -12,10 +12,10 @@ import os
 import hashlib
 from pydantic import BaseModel
 
-from models.automl_orchestrator import AutoMLOrchestrator
-from utils.data_processor import DataProcessor
-from utils.model_evaluator import ModelEvaluator
-from utils.chart_generator import ChartGenerator
+from backend.models.automl_orchestrator import AutoMLOrchestrator
+from backend.utils.data_processor import DataProcessor
+from backend.utils.model_evaluator import ModelEvaluator
+from backend.utils.chart_generator import ChartGenerator
 
 # Request models
 class ModelSuggestionRequest(BaseModel):
@@ -26,6 +26,11 @@ class TrainModelRequest(BaseModel):
     target_column: str
     selected_models: List[str]
     train_config: Optional[Dict[str, Any]] = None
+
+class ChartGenerationRequest(BaseModel):
+    session_id: str
+    target_column: Optional[str] = None
+    chart_types: Optional[List[str]] = None
 
 app = FastAPI(
     title="AutoML Orchestration API",
@@ -112,7 +117,8 @@ async def upload_data(file: UploadFile = File(...)):
         
         # Store session data
         active_sessions[session_id] = {
-            "data": df.to_dict(),
+            "data": df.to_dict('records'),  # Store as list of records for easier reconstruction
+            "dataframe_backup": df.copy(),  # Keep original DataFrame for debugging
             "analysis": processed_data,
             "uploaded_at": datetime.now().isoformat(),
             "filename": file.filename,
@@ -132,6 +138,8 @@ async def upload_data(file: UploadFile = File(...)):
             "is_duplicate": False
         }
         
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
@@ -143,7 +151,7 @@ async def suggest_models(session_id: str, request: ModelSuggestionRequest):
             raise HTTPException(status_code=404, detail="Session not found")
         
         session_data = active_sessions[session_id]
-        df = pd.DataFrame(session_data["data"])
+        df = pd.DataFrame(session_data["data"])  # Reconstruct from records
         
         # Get model suggestions from orchestrator
         suggestions = await orchestrator.suggest_models(
@@ -160,6 +168,8 @@ async def suggest_models(session_id: str, request: ModelSuggestionRequest):
             "timestamp": datetime.now().isoformat()
         }
         
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating suggestions: {str(e)}")
 
@@ -171,7 +181,7 @@ async def train_model(session_id: str, request: TrainModelRequest):
             raise HTTPException(status_code=404, detail="Session not found")
         
         session_data = active_sessions[session_id]
-        df = pd.DataFrame(session_data["data"])
+        df = pd.DataFrame(session_data["data"])  # Reconstruct from records
         
         # Train models
         training_results = await orchestrator.train_models(
@@ -190,6 +200,10 @@ async def train_model(session_id: str, request: TrainModelRequest):
             "results": training_results,
             "timestamp": datetime.now().isoformat()
         }
+    except HTTPException as he:
+        raise he
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
 
@@ -206,7 +220,7 @@ async def train_model(
             raise HTTPException(status_code=404, detail="Session not found")
         
         session_data = active_sessions[session_id]
-        df = pd.DataFrame(session_data["data"])
+        df = pd.DataFrame(session_data["data"])  # Reconstruct from records
         
         # Train models
         training_results = await orchestrator.train_models(
@@ -228,21 +242,22 @@ async def train_model(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error training models: {str(e)}")
 
-@app.get("/api/generate-charts/{session_id}")
-async def generate_charts(session_id: str, chart_types: Optional[List[str]] = None):
+@app.post("/api/generate-charts")
+async def generate_charts(request: ChartGenerationRequest):
     """Generate visualization charts for the dataset and results"""
     try:
+        session_id = request.session_id
         if session_id not in active_sessions:
             raise HTTPException(status_code=404, detail="Session not found")
         
         session_data = active_sessions[session_id]
-        df = pd.DataFrame(session_data["data"])
+        df = pd.DataFrame(session_data["data"])  # Reconstruct from records
         
         # Generate charts
         charts = chart_generator.generate_charts(
             df=df,
             training_results=session_data.get("training_results"),
-            chart_types=chart_types
+            chart_types=request.chart_types
         )
         
         return {
@@ -286,4 +301,8 @@ async def get_session(session_id: str):
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    import os
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+    backend_port = int(os.getenv('BACKEND_PORT', '8888'))
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=backend_port, reload=True)

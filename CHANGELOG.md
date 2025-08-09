@@ -5,6 +5,45 @@ All notable changes to the AutoML project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-08-08
+
+### Added
+- **Duplicate File Detection**: MD5 hashing to detect and reuse existing analysis
+- **Enhanced User Feedback**: Different visual states for new vs duplicate uploads
+- **Comprehensive Documentation**: CORS troubleshooting and upload functionality guides
+- **End-to-End Testing**: Complete automated testing suite for frontend-backend integration
+- **Manual Dashboard Navigation**: "Go to Dashboard Now" button for immediate access
+- **Smart Session Management**: Intelligent reuse of existing sessions for duplicate files
+
+### Fixed
+- **CORS Configuration**: Added support for frontend running on port 3004
+- **LinearRegression Model**: Removed invalid random_state parameter
+- **Dashboard API Integration**: Fixed data transformation between API and component interfaces
+- **Upload Button States**: Proper state management and visual feedback
+- **JSON Serialization**: Complete resolution of numpy type conversion issues
+- **Frontend Error Handling**: Better error messages and network failure handling
+
+### Changed
+- **Upload Experience**: Faster processing for duplicate files (1s vs 2s redirect)
+- **Visual Design**: Yellow warning for duplicates, green success for new uploads
+- **API Responses**: Enhanced structure with duplicate detection flags
+- **Button Behavior**: Dynamic text based on upload state and file status
+- **Error Messages**: More specific and actionable error descriptions
+
+### Technical
+- **Backend CORS**: Now supports localhost:3000, 3004, and 127.0.0.1 variants
+- **File Processing**: Hash-based duplicate detection with session mapping
+- **Request Handling**: Pydantic models for proper API request validation
+- **Response Format**: Standardized JSON responses with comprehensive metadata
+- **TypeScript**: Enhanced interfaces for better type safety
+
+## [1.1.0] - 2025-08-08log
+
+All notable changes to the AutoML project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [v1.1.0] - 2025-08-08
 
 ### 🎯 Major Features

@@ -50,7 +50,7 @@ export function DataUpload({ onDataUploaded }: DataUploadProps) {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8080/api/upload-data', {
+      const response = await fetch('http://localhost:8000/api/upload-data', {
         method: 'POST',
         body: formData,
       });
